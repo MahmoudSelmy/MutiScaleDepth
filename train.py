@@ -6,9 +6,9 @@ import model
 from Utills import output_predict
 
 BATCH_SIZE = 4
-TRAIN_FILE = "sub_train.csv"
-TEST_FILE = "test.csv"
-EPOCHS = 35
+TRAIN_FILE = "train.csv"
+TEST_FILE = "train.csv"
+EPOCHS = 2000
 
 IMAGE_HEIGHT = 228
 IMAGE_WIDTH = 304
@@ -37,10 +37,11 @@ def train_model(continue_flag,restore_scale2,train_scale2,freeze_scale1):
     with tf.Graph().as_default():
         # get batch
         global_step = tf.Variable(0, name='global_step', trainable=False)
-
+        mode = tf.placeholder(dtype=tf.bool, name='mode', shape=())
         with tf.device('/cpu:0'):
             batch_generator = BatchGenerator(batch_size=BATCH_SIZE)
-            train_images, train_depths, train_pixels_mask = batch_generator.csv_inputs(TRAIN_FILE)
+            # train_images, train_depths, train_pixels_mask = batch_generator.csv_inputs(TRAIN_FILE)
+            train_images, train_depths, train_pixels_mask = tf.cond(mode,lambda:batch_generator.csv_inputs(TRAIN_FILE),lambda:batch_generator.csv_inputs(TEST_FILE))
         '''
         # placeholders
             training_images = tf.placeholder(tf.float32, shape=[None, IMAGE_HEIGHT, IMAGE_WIDTH, 3], name="training_images")
@@ -61,7 +62,7 @@ def train_model(continue_flag,restore_scale2,train_scale2,freeze_scale1):
         lr = tf.train.exponential_decay(
             INITIAL_LEARNING_RATE,
             global_step,
-            decay_steps,
+            100000,
             LEARNING_RATE_DECAY_FACTOR,
             staircase=True)
 
@@ -101,7 +102,7 @@ def train_model(continue_flag,restore_scale2,train_scale2,freeze_scale1):
                     if variable_name.find('s2') >= 0:
                         scale2_params[variable_name] = variable
             # define savers
-            saver_scale1 = tf.train.Saver(scale1_params)
+            saver_scale1 = tf.train.Saver(scale1_params,max_to_keep=4)
             if train_scale2:
                 saver_scale2 = tf.train.Saver(scale2_params)
 
@@ -126,21 +127,27 @@ def train_model(continue_flag,restore_scale2,train_scale2,freeze_scale1):
             # initialize the queue threads to start to shovel data
             coord = tf.train.Coordinator()
             threads = tf.train.start_queue_runners(coord=coord)
+
+            # p = tf.Print(data_file,[data_file],message=)
+
             for epoch in range(EPOCHS):
-                for i in range(1000):
+                for i in range(45):
+                    # sess.run(p,feed_dict={data_file:'Test'})
                     if train_scale2:
-                        _, loss_value, predections_s1,predections_s2, batch_images,summary = sess.run([optimizer,loss,scale1,scale2, train_images,summary_op])
+                        _, loss_value, predections_s1,predections_s2, batch_images,summary = sess.run([optimizer,loss,scale1,scale2, train_images,summary_op],feed_dict={mode:True})
                     else:
-                        _, loss_value, predections_s1, batch_images, summary = sess.run([optimizer, loss, scale1, train_images, summary_op])
+                        _, loss_value, predections_s1, batch_images, summary = sess.run([optimizer, loss, scale1, train_images, summary_op],feed_dict={mode:True})
+
+                    validation_loss, _ = sess.run([loss, train_images],feed_dict={mode:False})
 
                     writer.add_summary(summary, epoch * 1000 + i)
 
-                    if i % 100 == 0:
+                    if i % 10 == 0:
                         # log.info('step' + loss_value)
-                        print("%s: %d[epoch]: %d[iteration]: train loss %f" % (datetime.now(), epoch, i, loss_value))
+                        print("%s: %d[epoch]: %d[iteration]: train loss %f : validation %f" % (datetime.now(), epoch, i, loss_value, validation_loss))
 
                     # print("%s: %d[epoch]: %d[iteration]: train loss %f" % (datetime.now(), epoch, i, loss_value))
-                    if i % 500 == 0:
+                    if i == 41:
                         # save predictions
                         if not freeze_scale1:
                             output_predict(predections_s1, batch_images, "data/predictions/predict_scale1_%05d_%05d" % (epoch, i))
@@ -159,7 +166,7 @@ def train_model(continue_flag,restore_scale2,train_scale2,freeze_scale1):
             sess.close()
 
 def main(argv=None):
-    train_model(True,False,True,True)
+    train_model(False,False,False,False)
 
 if __name__ == '__main__':
     tf.app.run()

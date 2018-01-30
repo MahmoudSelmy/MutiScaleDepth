@@ -54,13 +54,25 @@ def build_scale2(batch_data,scale1_op):
 
     conv_2_s2_ip = tf.concat([conv_1_s2, scale1_op],3,name='conv_1_s2_concat')
     print(conv_2_s2_ip.get_shape())
+    '''
+    conv_1_bneck_s2 = helper.conv2d(input=conv_1_s2, filter_size=1, number_of_channels=64, number_of_filters=16,
+                                    padding='VALID',
+                                    max_pool=False, layer_name='conv_1_bneck_s2')
+    print(conv_1_bneck_s2.get_shape())
+    '''
     conv_2_s2 = helper.conv2d(input=conv_2_s2_ip, filter_size=5, number_of_channels=64, number_of_filters=64,
                               padding='SAME',
                               max_pool=False,layer_name='conv_2_s2')
     print(conv_2_s2.get_shape())
-    # conv_2_s2_dropped = tf.nn.dropout(conv_2_s2, 0.8,name='conv_2_s2_drop')
+    '''
+    conv_2_bneck_s2 = helper.conv2d(input=conv_1_s2, filter_size=1, number_of_channels=64, number_of_filters=16,
+                                    padding='VALID',
+                                    max_pool=False, layer_name='conv_2_bneck_s2')
+    print(conv_2_bneck_s2.get_shape())
+    '''
+    conv_2_s2_dropped = tf.nn.dropout(conv_2_s2, 0.8,name='conv_2_s2_drop')
 
-    conv_3_s2 = helper.conv2d(input=conv_2_s2, filter_size=5, number_of_channels=64, number_of_filters=1,
+    conv_3_s2 = helper.conv2d(input=conv_2_s2_dropped, filter_size=5, number_of_channels=64, number_of_filters=1,
                               padding='SAME',
                               max_pool=False,layer_name='conv_3_s2',batch_norm=False)
     print(conv_3_s2.get_shape())
